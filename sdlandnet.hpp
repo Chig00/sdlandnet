@@ -21,7 +21,7 @@
  */
 namespace System {
 	// The current version of the library.
-	constexpr int VERSION[] = {2, 1, 0, 0};
+	constexpr int VERSION[] = {2, 1, 0, 1};
 	constexpr int VERSION_LENGTH = 4;
 	
 	// The number of letters and numbers.
@@ -165,7 +165,7 @@ namespace Random {
 	 * This function is a cross-platform replacement for std::uniform_int_distribution.
 	 */
 	int get_int(std::mt19937& generator, int min, int max) noexcept {
-		return min + generator() % (1 + max - min);
+		return min + generator() % static_cast<unsigned>(1 + max - min);
 	}
 	
 	/**
@@ -3087,4 +3087,6 @@ class Thread {
 	 v2.1:
 	   Added the Random namespace.
 	   System::command now returns the command's exit code.
+	 v2.1.0.1:
+	   Random::get_int() now converts (1 + max - min) to an unsigned integer.
  */
