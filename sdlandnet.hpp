@@ -21,7 +21,7 @@
  */
 namespace System {
 	// The current version of the library.
-	constexpr int VERSION[] = {3, 0, 0, 0};
+	constexpr int VERSION[] = {3, 0, 1, 0};
 	constexpr int VERSION_LENGTH = 4;
 	
 	// The number of letters and numbers.
@@ -1536,8 +1536,14 @@ class Sprite {
 		 * The Sprite is loaded from the BMP file passed in
 		 *   string form and is not scaled.
 		 */
-		Sprite(const std::string& source) noexcept {
+		Sprite(const std::string& source) {
 			surface = SDL_LoadBMP(source.c_str());
+            
+            // An exception is thrown, if the surface couldn't be loaded.
+            if (!surface) {
+                throw std::runtime_error("The image file could not be opened.");
+            }
+            
 			allocated = true;
 		}
 		
@@ -1546,8 +1552,14 @@ class Sprite {
 		 * The Sprite is loaded from the BMP file passed in
 		 *   string form and scaled to the given dimensions.
 		 */
-		Sprite(const std::string& source, int width, int height) noexcept {
+		Sprite(const std::string& source, int width, int height) {
 			SDL_Surface* raw_surface = SDL_LoadBMP(source.c_str());
+            
+            // An exception is thrown, if the surface couldn't be loaded.
+            if (!raw_surface) {
+                throw std::runtime_error("The image file could not be opened.");
+            }
+            
 			create_surface(width, height);
 			SDL_BlitScaled(raw_surface, nullptr, surface, nullptr);
 			SDL_FreeSurface(raw_surface);
@@ -3091,7 +3103,9 @@ class ServerThread: public Server, public MessengerThread {
          */
         bool initialise() noexcept {
             if (server_pointer) {
+                server_thread.wait();
                 Server::operator=(std::move(*server_pointer));
+                server_pointer = nullptr;
                 initialised = true;
             }
             
@@ -3125,6 +3139,10 @@ class BridgeThread: public Bridge {
 //}
 
 /* CHANGELOG:
+     v3.0.1:
+       Sprite's constructors, that load a BMP from the given source,
+         now throw an exception if the Surface could not be loaded.
+       ServerThread::initialise() now resets server_thread and server_pointer.
      v3:
        Added the AudioThread class.
        Added the MessengerThread abstract base class.
