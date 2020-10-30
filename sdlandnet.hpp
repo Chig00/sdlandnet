@@ -21,7 +21,7 @@
  */
 namespace System {
 	// The current version of the library.
-	constexpr int VERSION[] = {3, 0, 1, 0};
+	constexpr int VERSION[] = {3, 0, 1, 1};
 	constexpr int VERSION_LENGTH = 4;
 	
 	// The number of letters and numbers.
@@ -601,37 +601,44 @@ class Messenger {
 		 * The string is padded to be of a specific length.
 		 */
 		void send(std::string message, int length = -1) const {
+            // If the socket has not been initialised, an exception is thrown.
             if (!socket) {
                 throw std::runtime_error("Uninitialised socket.");
             }
             
+            // If the string's length is unspecified or invalid, the default length is used.
 			if (length < 0) {
 				length = padding;
 			}
+            
+            // The message is padded to match the given length - 1.
+            // length - 1, because c_str() appends the string with '\0' for the full length.
+            message += std::string(length - message.length() - 1, padder);
 			
-			while (message.length() < length - 1) {
-				message += padder;
-			}
-			
-			SDLNet_TCP_Send(socket, message.c_str(), message.length() + 1);
+            // The message is sent in byte form.
+			SDLNet_TCP_Send(socket, message.c_str(), length);
 		}
 		
 		/**
 		 * Receives a string from the other messenger.
 		 * A maximum number of bytes, equal to buffer_size, is read.
-		 * Uses C-style strings internally, so buffer_size,
-		 *   should be one greater than the length of the string sent.
+		 * Uses C-style strings internally, so buffer_size should
+		 *   be one greater than the length of the C++ string sent.
 		 */
 		std::string read(int buffer_size = DEFAULT_READ) const {
+            // If the socket has not been initialised, an exception is thrown.
             if (!socket) {
                 throw std::runtime_error("Uninitialised socket.");
             }
             
-			char* buffer = new char[buffer_size];
-			SDLNet_TCP_Recv(socket, buffer, buffer_size);
-			std::string message(buffer);
-			delete[] buffer;
-			return message;
+            // A vector is used to store the received message.
+			std::vector<char> buffer(buffer_size);
+            
+            // The message is received and stored in the vector.
+			SDLNet_TCP_Recv(socket, buffer.data(), buffer_size);
+            
+            // A C++ string is formed from the received message and returned.
+			return std::string(buffer.data());
 		}
 
 		static constexpr int DEFAULT_READ = 1000; // Default max for read().
@@ -3139,6 +3146,10 @@ class BridgeThread: public Bridge {
 //}
 
 /* CHANGELOG:
+     v3.0.1.1:
+       Messenger::send() no longer uses a loop to pad the message.
+       Messenger::read() uses a vector instead of dynamically allocating a buffer.
+       Improved comments in Messenger::send() and Messenger::read().
      v3.0.1:
        Sprite's constructors, that load a BMP from the given source,
          now throw an exception if the Surface could not be loaded.
