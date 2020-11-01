@@ -11,6 +11,8 @@
 #include <ctime>
 #include <limits>
 #include <random>
+#include <SDL.h>
+#include <SDL_net.h>
 
 // System, Timer, and Random
 //{
