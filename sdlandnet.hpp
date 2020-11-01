@@ -11,8 +11,6 @@
 #include <ctime>
 #include <limits>
 #include <random>
-#include <SDL.h>
-#include <SDL_net.h>
 
 // System, Timer, and Random
 //{
@@ -21,8 +19,8 @@
  */
 namespace System {
 	// The current version of the library.
-	constexpr int VERSION[] = {3, 0, 1, 1};
 	constexpr int VERSION_LENGTH = 4;
+	constexpr int VERSION[VERSION_LENGTH] = {3, 0, 2, 0};
 	
 	// The number of letters and numbers.
 	constexpr int LETTERS = 26;
@@ -179,7 +177,7 @@ namespace Random {
 	 * A function that returns a random real number in the interval [min, max).
 	 * This function is a cross-platform replacement for std::uniform_real_distribution.
 	 */
-	double get_real(std::mt19937& generator, int min, int max) {
+	double get_real(std::mt19937& generator, double min, double max) {
         if (RANDOM_ASSERTION) {
             throw std::runtime_error(RANDOM_ERROR);
         }
@@ -195,7 +193,7 @@ namespace Random {
 	/**
 	 * A function that returns a random real number in the interval [min, max].
 	 */
-	double get_double(std::mt19937& generator, int min, int max) {
+	double get_double(std::mt19937& generator, double min, double max) {
         if (RANDOM_ASSERTION) {
             throw std::runtime_error(RANDOM_ERROR);
         }
@@ -1548,7 +1546,7 @@ class Sprite {
             
             // An exception is thrown, if the surface couldn't be loaded.
             if (!surface) {
-                throw std::runtime_error("The image file could not be opened.");
+                throw std::runtime_error(source + " could not be opened.");
             }
             
 			allocated = true;
@@ -1564,7 +1562,7 @@ class Sprite {
             
             // An exception is thrown, if the surface couldn't be loaded.
             if (!raw_surface) {
-                throw std::runtime_error("The image file could not be opened.");
+                throw std::runtime_error(source + " could not be opened.");
             }
             
 			create_surface(width, height);
@@ -1572,6 +1570,25 @@ class Sprite {
 			SDL_FreeSurface(raw_surface);
 		}
 		
+        /**
+		 * Constructs a new Sprite object.
+		 * The Sprite is loaded from the BMP file passed in
+		 *   string form and scaled to the given dimensions.
+         * The size of the sprite is a ratio of the given sprite.
+		 */
+        Sprite(
+            const std::string& source,
+            const Sprite& stemplate,
+            double width,
+            double height
+        ):
+            Sprite(
+                source,
+                width * stemplate.width(),
+                height * stemplate.height()
+            )
+        {}
+        
 		/**
 		 * Copying a sprite can be done safely using blitting.
 		 */
@@ -2121,7 +2138,7 @@ class Display: public Sprite {
 		}
 		
         static constexpr Uint32 DEFAULT_FLAGS =
-            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
+            SDL_WINDOW_SHOWN
         ; // The default window flags used for window creation.
 		SDL_Window* window;            // The window for the display.
 		bool window_allocated = false; // True if this class allocated memory for the window.
@@ -2293,7 +2310,7 @@ class Audio {
 			SDL_AudioSpec audio_spec;
             
 			if (!SDL_LoadWAV(source.c_str(), &audio_spec, &audio_buffer, &audio_length)) {
-                throw std::runtime_error("The audio file could not be opened.");
+                throw std::runtime_error(source + " could not be opened.");
             }
             
 			audio_device = SDL_OpenAudioDevice(nullptr, false, &audio_spec, nullptr, 0);
@@ -2331,7 +2348,7 @@ class Audio {
 class Button {
 	public:
 		/**
-		 * Constructs a new Button object from given Sprite.
+		 * Constructs a new Button object from given copied Sprite.
 		 * The Rectangle is constructed at the given position
 		 *   and sets the dimensions to the sprite's dimensions.
 		 */
@@ -2341,7 +2358,7 @@ class Button {
 		{}
 		
 		/**
-		 * Constructs a new Button object from given Sprite.
+		 * Constructs a new Button object from given moved Sprite.
 		 * The Rectangle is constructed at the given position
 		 *   and sets the dimensions to the sprite's dimensions.
 		 */
@@ -2351,7 +2368,7 @@ class Button {
 		{}
 		
 		/**
-		 * Constructs a new Button object from the given Sprite.
+		 * Constructs a new Button object from the given copied Sprite.
 		 * The Rectangle is constructed with its dimensions set
 		 *   to the sprite's dimensions.
 		 * The Rectangle's position is set to mirror the effects
@@ -2373,7 +2390,7 @@ class Button {
 		{}
 		
 		/**
-		 * Constructs a new Button object from the given Sprite.
+		 * Constructs a new Button object from the given moved Sprite.
 		 * The Rectangle is constructed with its dimensions set
 		 *   to the sprite's dimensions.
 		 * The Rectangle's position is set to mirror the effects
@@ -2490,8 +2507,8 @@ class Renderer {
 			int width,
 			int height,
 			int x_separation = 0,
-			int max_width = 0,
 			int y_separation = 0,
+			int max_width = 0,
 			Justification justification = CENTRE_JUSTIFY
 		) const noexcept {
 			// If the text is empty an empty sprite is returned.
@@ -2627,6 +2644,7 @@ class Renderer {
 		 * The size (in pixels) of the characters must be specified.
 		 * The maximum width of the sprite and the space between lines can be defined.
 		 * The justification of the resulting sprite can be defined.
+		 * Uses ratios of the given sprite to determine the character size.
 		 */
 		Sprite lined_render(
 			const Sprite& ratio_base,
@@ -2634,8 +2652,8 @@ class Renderer {
 			double width,
 			double height,
 			double x_separation = 0,
-			double max_width = 0,
 			double y_separation = 0,
+			double max_width = 0,
 			Justification justification = CENTRE_JUSTIFY
 		) const noexcept {
 			return lined_render(
@@ -2643,8 +2661,8 @@ class Renderer {
 				width * ratio_base.width(),
 				height * ratio_base.height(),
 				x_separation * ratio_base.width(),
-				max_width * ratio_base.width(),
 				y_separation * ratio_base.height(),
+				max_width * ratio_base.width(),
 				justification
 			);
 		}
@@ -3146,6 +3164,14 @@ class BridgeThread: public Bridge {
 //}
 
 /* CHANGELOG:
+     v3.0.2:
+       Added a Sprite source-loaded, ratio constructor.
+       Random::get_real() and Random::get_double() now take doubles instead of ints.
+       y_separation and max_width have swapped argument positions in Renderer::lined_render().
+       System::VERSION is now defined to be of size System::VERSION_LENGTH.
+       Exceptions from a missing source now display the source that is missing.
+       SDL_WINDOW_RESIZABLE was removed from Display::DEFAULT_FLAGS.
+       Improved documentation of functions overloads.
      v3.0.1.1:
        Messenger::send() no longer uses a loop to pad the message.
        Messenger::read() uses a vector instead of dynamically allocating a buffer.
