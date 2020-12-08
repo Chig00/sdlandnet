@@ -22,7 +22,7 @@
 namespace System {
 	// The current version of the library.
 	constexpr int VERSION_LENGTH = 4;
-	constexpr int VERSION[VERSION_LENGTH] = {3, 0, 2, 0};
+	constexpr int VERSION[VERSION_LENGTH] = {4, 0, 0, 0};
 	
 	// The number of letters and numbers.
 	constexpr int LETTERS = 26;
@@ -355,6 +355,8 @@ class Point {
 
 /**
  * A namespace for event handling functions.
+ * Contains aliases for various mouse buttons and keyboard scan codes.
+ * The Event class is the preferred method for event handling.
  */
 namespace Events {
 	// For use with mouse click functions.
@@ -585,6 +587,187 @@ bool Point::click(int button = Events::LEFT_CLICK) noexcept {
 bool Point::unclick(int button = Events::LEFT_CLICK) noexcept {
 	return Events::unclick(button, *this);
 }
+
+/**
+ * A class that defines an event.
+ * This is the preferred method for event handling.
+ */
+class Event {
+    public:
+        /**
+         * Defines different types of event.
+         */
+        enum Type {
+            MISCELLANEOUS,
+            TERMINATE,
+            KEY_PRESS,
+            KEY_RELEASE,
+            MOUSE_MOTION,
+            LEFT_CLICK,
+            LEFT_UNCLICK,
+            MIDDLE_CLICK,
+            MIDDLE_UNCLICK,
+            RIGHT_CLICK,
+            RIGHT_UNCLICK,
+            SCROLL
+        };
+        
+        /**
+         * Creates an uninitialised event.
+         */
+        Event() noexcept {}
+        
+        /**
+         * Sets the event to the oldest event in the event queue.
+         * The event is removed.
+         * Returns false if the event queue is empty.
+         */
+        bool poll() noexcept {
+            bool pending = SDL_PollEvent(&event);
+            type_ = determine();
+            
+            return pending;
+        }
+        
+        /**
+         * Sets the event to the oldest event in the event queue.
+         * The event is removed.
+         * Halts thread execution while the event queue is empty.
+         * Throws an exception upon error.
+         */
+        void wait() {
+            bool error = !SDL_WaitEvent(&event);
+            
+            if (error) {
+                throw std::runtime_error(SDL_GetError());
+            }
+            
+            type_ = determine();
+        }
+        
+        /**
+         * Sets the event to the oldest event in the event queue.
+         * The event is removed.
+         * Halts thread execution while the event queue is
+         *   empty for the time given (in milliseconds).
+         * Returns false if time ran out or an error occurred.
+         */
+        bool timed_wait(int ms) noexcept {
+            bool pending = SDL_WaitEventTimeout(&event, ms);
+            type_ = determine();
+            
+            return pending;
+        }
+        
+        /**
+         * Returns the type of event.
+         */
+        Type type() const noexcept {
+            return type_;
+        }
+        
+        /**
+         * Returns the key of the keyboard event.
+         */
+        int key() const noexcept {
+            return event.key.keysym.scancode;
+        }
+        
+        /**
+         * Returns the relative position of the mouse since the last motion.
+         */
+        Point motion() const noexcept {
+            return Point(event.motion.xrel, event.motion.yrel);
+        }
+        
+        /**
+         * Returns the relative scroll of the mouse wheel.
+         */
+        Point scroll() const noexcept {
+            int normal = event.wheel.direction == SDL_MOUSEWHEEL_NORMAL ? 1 : -1;
+            
+            return Point(normal * event.wheel.x, normal * event.wheel.y);
+        }
+        
+        /**
+         * Returns the coordinates of a motion event.
+         */
+        Point motion_position() const noexcept {
+            return Point(event.motion.x, event.motion.y);
+        }
+        
+        /**
+         * Returns the coordinates of a click/unclick event.
+         */
+        Point click_position() const noexcept {
+            return Point(event.button.x, event.button.y);
+        }
+    
+    private:
+        /**
+         * Determines the event's type.
+         */
+        Type determine() const noexcept {
+            switch (event.type) {
+                case SDL_WINDOWEVENT:
+                    switch (event.window.event) {
+                        case SDL_WINDOWEVENT_CLOSE:
+                            return TERMINATE;
+                        
+                        default:
+                            return MISCELLANEOUS;
+                    }
+                
+                case SDL_KEYDOWN:
+                    return KEY_PRESS;
+                    
+                case SDL_KEYUP:
+                    return KEY_RELEASE;
+                
+                case SDL_MOUSEMOTION:
+                    return MOUSE_MOTION;
+                
+                case SDL_MOUSEBUTTONDOWN:
+                    switch (event.button.button) {
+                        case SDL_BUTTON_LEFT:
+                            return LEFT_CLICK;
+                        
+                        case SDL_BUTTON_MIDDLE:
+                            return MIDDLE_CLICK;
+                        
+                        case SDL_BUTTON_RIGHT:
+                            return RIGHT_CLICK;
+                        
+                        default:
+                            return MISCELLANEOUS;
+                    }
+                
+                case SDL_MOUSEBUTTONUP:
+                    switch (event.button.button) {
+                        case SDL_BUTTON_LEFT:
+                            return LEFT_UNCLICK;
+                        
+                        case SDL_BUTTON_MIDDLE:
+                            return MIDDLE_UNCLICK;
+                        
+                        case SDL_BUTTON_RIGHT:
+                            return RIGHT_UNCLICK;
+                        
+                        default:
+                            return MISCELLANEOUS;
+                    }
+                
+                case SDL_MOUSEWHEEL:
+                    return SCROLL;
+                
+                default:
+                    return MISCELLANEOUS;
+            }
+        }
+        
+        SDL_Event event; // The internal SDL Event.
+        Type type_; // The type of event.
+};
 //}
 
 // Messenger Classes
@@ -641,7 +824,7 @@ class Messenger {
 			return std::string(buffer.data());
 		}
 
-		static constexpr int DEFAULT_READ = 1000; // Default max for read().
+		static constexpr int DEFAULT_READ = 100; // Default max for read().
 		static constexpr int DEFAULT_PADDING = DEFAULT_READ; // Default min for send().
 		static constexpr char DEFAULT_PADDER = '\0'; // Default padder for send().
 		
@@ -2148,7 +2331,7 @@ class Display: public Sprite {
 
 /**
  * A class that manages the audio system.
- * Each instance of this class corresponds to an audio clip.
+ * Each instance of this class corresponds to an audio segment and device.
  */
 class Audio {
 	public:
@@ -2885,6 +3068,8 @@ class FullRenderer: public Renderer {
 
 // Multithreading
 //{
+// Thread Primitives
+//{
 /**
  * Manages a separate thread of execution.
  * This is for use with 32-bit libraries,
@@ -2980,6 +3165,285 @@ class Thread {
 		SDL_Thread* thread = nullptr; // The thread of execution.
 };
 
+// Declaration for friendship declaration.
+class ConditionVariable;
+
+/**
+ * An abstraction of the mutex thread primitive.
+ */
+class Mutex {
+    // Condition variables are associated with a mutex when waiting.
+    friend class ConditionVariable;
+    
+    public:
+        /**
+         * Creates a new unlocked mutex.
+         * Throws an exception if the construction fails.
+         */
+        Mutex() {
+            if (!(mutex = SDL_CreateMutex())) {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Destroys the mutex.
+         * The mutex should have been unlocked before destruction.
+         */
+        ~Mutex() noexcept {
+            SDL_DestroyMutex(mutex);
+        }
+        
+        /**
+         * Locks the mutex.
+         * Locks are recursive, so multiple locks by a single
+         *   thread will require the same number of unlocks.
+         * Locking a mutex locked by another thread will cause a block.
+         * Throws an exception if the mutex could not be locked.
+         */
+        void lock() {
+            if (SDL_LockMutex(mutex)) {
+                throw std::runtime_error(SDL_GetError());
+            }
+            
+            ++locks;
+        }
+        
+        /**
+         * Locks the mutex, if it is unlocked or the calling thread owns the lock.
+         * Locks are recursive, so multiple locks by a single
+         *   thread will require the same number of unlocks.
+         * Locking a mutex locked by another thread will not cause a block.
+         * Returns true if the mutex was locked, false if the lock is
+         *   held by another thread, and throws an exception on error.
+         */
+        bool try_lock() {
+            int status = SDL_TryLockMutex(mutex);
+            
+            if (!status) {
+                ++locks;
+                return true;
+            }
+            
+            else if (status == SDL_MUTEX_TIMEDOUT) {
+                return false;
+            }
+            
+            else {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Attempts to unlock the mutex.
+         * Throws an exception on error.
+         * Throws an exception if the mutex was already unlocked.
+         */
+        void unlock() {
+            if (!locks) {
+                throw std::runtime_error("The mutex is not locked.");
+            }
+            
+            --locks;
+            
+            if (SDL_UnlockMutex(mutex)) {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Returns the number of recursive locks on the mutex.
+         */
+        int count_locks() const noexcept {
+            return locks;
+        }
+        
+    private:
+        SDL_mutex* mutex; // The pointer to the raw mutex.
+        int locks = 0; // The number of recursive locks made.
+};
+
+/**
+ * An abstraction of the semaphore thread primitive.
+ */
+class Semaphore {
+    public:
+        /**
+         * Creates a new mutex initialised with the given value.
+         * Throws an exception if the construction fails.
+         */
+        Semaphore(Uint32 value) {
+            if (!(semaphore = SDL_CreateSemaphore(value))) {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Destroys the semaphore.
+         * The semaphore should not be waited on upon destruction.
+         */
+        ~Semaphore() noexcept {
+            SDL_DestroySemaphore(semaphore);
+        }
+        
+        /**
+         * Waits for the semaphore to have a positive value and decrements it.
+         * Throws an exception upon error.
+         */
+        void wait() {
+            if (SDL_SemWait(semaphore)) {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Decrements the value of the semaphore if it is positive.
+         * Returns true if the semaphore was decremented, false if the
+         *   semaphore had a non-positive value, and throws with an error.
+         * Does not wait for a positive value unlike wait().
+         */
+        bool try_wait() {
+            int status = SDL_SemTryWait(semaphore);
+            
+            if (!status) {
+                return true;
+            }
+            
+            else if (status == SDL_MUTEX_TIMEDOUT) {
+                return false;
+            }
+            
+            else {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Waits for a given amount of time in milliseconds for the
+         *   semaphore to have a positive value and decrements it.
+         * Returns true if the semaphore was decremented, false if
+         *   the semaphore timed out, and throws with an error.
+         */
+        bool timed_wait(Uint32 ms) {
+            int status = SDL_SemWaitTimeout(semaphore, ms);
+            
+            if (!status) {
+                return true;
+            }
+            
+            else if (status == SDL_MUTEX_TIMEDOUT) {
+                return false;
+            }
+            
+            else {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Increments the semaphore's value and waits waiting threads.
+         * Throws an exception upon error.
+         */
+        void post() {
+            if (SDL_SemPost(semaphore)) {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Returns the current value of the semaphore.
+         */
+        Uint32 get_value() noexcept {
+            return SDL_SemValue(semaphore);
+        }
+        
+    private:
+        SDL_sem* semaphore; // The pointer to the raw semaphore.
+};
+
+/**
+ * An abstraction of the condition variable thread primitive.
+ */
+class ConditionVariable {
+    public:
+        /**
+         * Creates a new condition variable.
+         * Throws if the condition variable could not be created.
+         */
+        ConditionVariable() {
+            if (!(condition_variable = SDL_CreateCond())) {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Destroys the ocndition variable.
+         */
+        ~ConditionVariable() noexcept {
+            SDL_DestroyCond(condition_variable);
+        }
+        
+        /**
+         * Waits for the condition variable to be signalled.
+         * The given locked mutex is temporarily unlocked while waiting.
+         * Throws an exception upon error.
+         */
+        void wait(Mutex& mutex) {
+            if (SDL_CondWait(condition_variable, mutex.mutex)) {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Waits for a given number of milliseconds for
+         *   the condition variable to be signalled.
+         * The given locked mutex is temporarily unlocked while waiting.
+         * Returns true if the condition variable was signalled, false
+         *   if the time ran out, and throws an exception upon error.
+         */
+        bool timed_wait(Mutex& mutex, Uint32 ms) {
+            int status = SDL_CondWaitTimeout(condition_variable, mutex.mutex, ms);
+            
+            if (!status) {
+                return true;
+            }
+            
+            else if (status == SDL_MUTEX_TIMEDOUT) {
+                return false;
+            }
+            
+            else {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Signals one thread that is waiting on the condition variable.
+         * Throws an exception upon error.
+         */
+        void signal() {
+            if (SDL_CondSignal(condition_variable)) {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+        /**
+         * Signals all of the threads waiting on the condition variable.
+         * Throws an exception upon error.
+         */
+        void broadcast() {
+            if (SDL_CondBroadcast(condition_variable)) {
+                throw std::runtime_error(SDL_GetError());
+            }
+        }
+        
+    private:
+        SDL_cond* condition_variable; // The pointer to the raw condition variable.
+};
+//}
+
+// Utility
+//{
 /**
  * A class for queuing audio in a separate thread of execution.
  * Publically inherits from Audio, but using Audio-specific functions is not recommended.
@@ -3164,8 +3628,16 @@ class BridgeThread: public Bridge {
         Thread bridge_thread; // The thread in which the bridge is maintained.
 };
 //}
+//}
 
 /* CHANGELOG:
+     v4:
+       Added the Event Class.
+       Added the Mutex Class.
+       Added the Semaphore Class.
+       Added the ConditionVariable Class.
+       Changed the value of Messenger::DEFAULT_READ from 1000 to 100.
+       Slight modifications to documentation.
      v3.0.2:
        Added a Sprite source-loaded, ratio constructor.
        Random::get_real() and Random::get_double() now take doubles instead of ints.
