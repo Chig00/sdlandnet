@@ -22,7 +22,7 @@
 namespace System {
 	// The current version of the library.
 	constexpr int VERSION_LENGTH = 4;
-	constexpr int VERSION[VERSION_LENGTH] = {4, 0, 0, 0};
+	constexpr int VERSION[VERSION_LENGTH] = {4, 0, 1, 0};
 	
 	// The number of letters and numbers.
 	constexpr int LETTERS = 26;
@@ -609,7 +609,8 @@ class Event {
             MIDDLE_UNCLICK,
             RIGHT_CLICK,
             RIGHT_UNCLICK,
-            SCROLL
+            SCROLL,
+            RESIZE
         };
         
         /**
@@ -713,6 +714,9 @@ class Event {
                     switch (event.window.event) {
                         case SDL_WINDOWEVENT_CLOSE:
                             return TERMINATE;
+                        
+                        case SDL_WINDOWEVENT_SIZE_CHANGED:
+                            return RESIZE;
                         
                         default:
                             return MISCELLANEOUS;
@@ -2287,6 +2291,14 @@ class Display: public Sprite {
 			return *this;
 		}
 		
+        /**
+         * Reallocates the window (usually after a resize).
+         */
+        void resize() noexcept {
+            destroy_window();
+            create_window(title, width, height, flags);
+        }
+        
 	private:
 		/**
 		 * Creates the window and its sprite.
@@ -2300,6 +2312,10 @@ class Display: public Sprite {
 			int height,
 			Uint32 flags
 		) noexcept {
+            this->title = title;
+            this->width = width;
+            this->height = height;
+            this->flags = flags;
 			window = SDL_CreateWindow(
 				title.c_str(),
 				SDL_WINDOWPOS_UNDEFINED,
@@ -2323,10 +2339,14 @@ class Display: public Sprite {
 		}
 		
         static constexpr Uint32 DEFAULT_FLAGS =
-            SDL_WINDOW_SHOWN
+            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
         ; // The default window flags used for window creation.
 		SDL_Window* window;            // The window for the display.
 		bool window_allocated = false; // True if this class allocated memory for the window.
+        std::string title;
+        int width;
+        int height;
+        Uint32 flags;
 };
 
 /**
@@ -3631,6 +3651,10 @@ class BridgeThread: public Bridge {
 //}
 
 /* CHANGELOG:
+     v4.0.1:
+       Added the RESIZE Event::Type.
+       Added the Display::resize() method.
+       Added SDL_WINDOW_RESIZABLE to Display::DEFAULT_FLAGS.
      v4:
        Added the Event Class.
        Added the Mutex Class.
