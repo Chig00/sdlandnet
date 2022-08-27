@@ -25,7 +25,7 @@ namespace System {
     //{
 	// The current version of the library.
 	constexpr int VERSION_LENGTH = 4;
-	constexpr int VERSION[VERSION_LENGTH] = {4, 1, 0, 0};
+	constexpr int VERSION[VERSION_LENGTH] = {4, 1, 0, 1};
 	
 	// The number of letters and numbers.
 	constexpr int LETTERS = 26;
