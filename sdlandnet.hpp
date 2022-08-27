@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <cmath>
 #include <ctime>
+#include <chrono>
 #include <limits>
 #include <random>
 #include <SDL.h>
@@ -136,7 +137,9 @@ namespace Timer {
 	 * All times returned are relative to each other.
 	 */
 	double time() noexcept {
-		return static_cast<double>(clock()) / CLOCKS_PER_SEC;
+		return static_cast<std::chrono::duration<double>>(
+            std::chrono::steady_clock::now().time_since_epoch()
+        ).count();
 	}
 
 	/**
@@ -3934,6 +3937,8 @@ class BridgeThread: public Bridge {
 //}
 
 /* CHANGELOG:
+     v4.1.0.1:
+       Fixed Timer::time() to match the wall time in variable clock speed environments.
      v4.1:
        Added the RNG class.
      v4.0.3.1:
