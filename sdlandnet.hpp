@@ -25,7 +25,7 @@ namespace System {
     //{
     // The current version of the library.
     constexpr int VERSION_LENGTH = 4;
-    constexpr int VERSION[VERSION_LENGTH] = {4, 2, 0, 0};
+    constexpr int VERSION[VERSION_LENGTH] = {4, 2, 0, 1};
     
     // The number of letters and numbers.
     constexpr int LETTERS = 26;
@@ -1004,6 +1004,11 @@ class Event {
 class Messenger {
     public:
         /**
+         * Virtual destructor for subclasses.
+         */
+        virtual ~Messenger() noexcept {}
+        
+        /**
          * Sends the string passed to the other messenger.
          * The string is padded to be of a specific length.
          */
@@ -1077,7 +1082,7 @@ class Server: public virtual Messenger {
          * Constructs an uninitialised Server to be initialised later.
          */
         Server() noexcept {}
-    
+        
         /**
          * Constructs a new TCP messenger for the server.
          * The server is hosted at localhost:[port].
@@ -1126,11 +1131,10 @@ class Server: public virtual Messenger {
             operator=(std::move(s));
         }
         
-        
         /**
          * Closes the TCP sockets associated with the messenger.
          */
-        ~Server() noexcept {
+        virtual ~Server() noexcept override {
             close_sockets();
         }
         
@@ -1247,7 +1251,7 @@ class Client: public virtual Messenger {
         /**
          * Closes the TCP socket associated with the messenger.
          */
-        ~Client() noexcept {
+        virtual ~Client() noexcept override {
             close_socket();
         }
 
@@ -1455,6 +1459,11 @@ class Bridge {
         {}
         
         /**
+         * Virtual destructor for subclasses.
+         */
+        virtual ~Bridge() noexcept {}
+        
+        /**
          * Returns a constant reference to the source messenger.
          */
         const Messenger& get_source() const noexcept {
@@ -1514,6 +1523,11 @@ class Bridge {
  */
 class Shape {
     public:
+        /**
+         * Virtual destructor for subclasses.
+         */
+        virtual ~Shape() noexcept {}
+        
         /**
          * Returns true if the Point is contained within the shape.
          */
@@ -2077,10 +2091,10 @@ class Sprite {
         //}
         
         /**
-         * Frees the mmeory dynamically allocated to the surface
+         * Frees the memory dynamically allocated to the surface
          *   if it was allocated in this class.
          */
-        ~Sprite() noexcept {
+        virtual ~Sprite() noexcept {
             destroy_surface();
         }
         
@@ -2526,7 +2540,7 @@ class Display: public Sprite {
          *   the memory for it was allocated by this object.
          * Frees the memory allocated to the Sprite object.
          */
-        ~Display() noexcept {
+        ~Display() noexcept override {
             destroy_window();
         }
         
@@ -2708,7 +2722,7 @@ class Audio {
         /**
          * Frees all memory dynamically allocated to this object.
          */
-        ~Audio() noexcept {
+        virtual ~Audio() noexcept {
             free_audio();
         }
         
@@ -3003,6 +3017,11 @@ class Renderer {
             CENTRE_JUSTIFY,
             RIGHT_JUSTIFY
         };
+        
+        /**
+         * Virtual destructor for subclasses.
+         */
+        virtual ~Renderer() noexcept {}
         
         /**
          * Returns a sprite that is a single line rendering of the passed string.
@@ -3922,7 +3941,7 @@ class AudioThread: public Audio {
         /**
          * Explicit destructor to prevent an eternal Thread.wait().
          */
-        ~AudioThread() noexcept {
+        ~AudioThread() noexcept override {
             stop();
         }
         
@@ -3959,6 +3978,11 @@ class AudioThread: public Audio {
  */
 class MessengerThread: public virtual Messenger {
     public:
+        /**
+         * Virtual destructor for subclasses.
+         */
+        virtual ~MessengerThread() noexcept override {}
+        
         /**
          * Waits for one message from the other messenger in another thread.
          * Resets the message to the given reset string.
@@ -4036,7 +4060,7 @@ class ClientThread: public Client, public MessengerThread {
 class ServerThread: public Server, public MessengerThread {
     public:
         /**
-         * Constructs a ServerThread object by partially initialisation.
+         * Constructs a ServerThread object partially initialised.
          * The Server is attempted to be constructed in another thread.
          * initialise() should be called periodically in the main
          *   thread to attempt to finish the initialisation.
@@ -4099,6 +4123,8 @@ class BridgeThread: public Bridge {
 //}
 
 /* CHANGELOG:
+     v4.2.0.1:
+       Use virtual destructors for classes intended to be subclassed.
      v4.2:
        Added the Logger class.
        Added Events::set_clipboard() and Events::get_keyboard().
